@@ -1,0 +1,28 @@
+{
+  "name": "e-commerce_be",
+  "version": "1.0.0",
+  "description": "A simple E-commerce Web Backend",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zain0313233/E-Commerce_BE.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zain0313233/E-Commerce_BE/issues"
+  },
+  "homepage": "https://github.com/zain0313233/E-Commerce_BE#readme",
+  "dependencies": {
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
