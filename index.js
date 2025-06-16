@@ -1,11 +1,13 @@
 require('dotenv').config();
 const express =require('express');
 const { testConnection } = require("./database/index");
+const Productroutes=require('./routes/productrotes')
 require("dotenv").config();
 
 const app=express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/api/product',Productroutes);
 app.use('/api/health',(req,res)=>{
     res.status(200).json({
         status:"ok",

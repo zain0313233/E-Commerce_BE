@@ -20,6 +20,10 @@ const Product = Sequelize.define('Product', {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false
   },
+  discount_percentage: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true
+  },
   category: {
     type: DataTypes.STRING(100),
     allowNull: true
@@ -29,6 +33,10 @@ const Product = Sequelize.define('Product', {
     allowNull: true
   },
   image_url: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  thumbnail_url: {
     type: DataTypes.TEXT,
     allowNull: true
   },
@@ -45,6 +53,10 @@ const Product = Sequelize.define('Product', {
       max: 5
     }
   },
+  tags: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
   created_at: {
     type: DataTypes.DATE,
     allowNull: false,
@@ -52,7 +64,7 @@ const Product = Sequelize.define('Product', {
   }
 }, {
   tableName: 'products',
-  timestamps: false, 
+  timestamps: false,
   schema: 'ecommerce',
 });
 
