@@ -51,6 +51,6 @@ const dbUser=await User.findOne({
     });
   }
 }
-module.export={
+module.exports={
   authenticateToken
 }

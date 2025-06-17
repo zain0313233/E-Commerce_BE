@@ -57,6 +57,15 @@ const Product = Sequelize.define('Product', {
     type: DataTypes.JSON,
     allowNull: true
   },
+  user_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    comment: 'References user who created this product. Null for scraped products from external APIs'
+  },
   created_at: {
     type: DataTypes.DATE,
     allowNull: false,
@@ -68,4 +77,6 @@ const Product = Sequelize.define('Product', {
   schema: 'ecommerce',
 });
 
-module.exports = Product;
+module.exports = {
+  Product
+};
