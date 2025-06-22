@@ -2,7 +2,10 @@ require('dotenv').config();
 const cors = require('cors');
 const express =require('express');
 const { testConnection } = require("./database/index");
-const Productroutes=require('./routes/productrotes')
+const Productroutes=require('./routes/productrotes');
+const authroutes = require('./routes/authroutes');
+const cartRoutes = require('./routes/cartRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 require("dotenv").config();
 
 const app=express();
@@ -14,6 +17,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/api/auth',authroutes);
+app.use('/api/cart',cartRoutes);
+app.use('/api/order',orderRoutes);
 app.use('/api/product',Productroutes);
 app.use('/api/health',(req,res)=>{
     res.status(200).json({
