@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
+const sequelize = require('../config/db');
 const multer = require("multer");
+const { Op } = require('sequelize');
 const path = require("path");
 const { authenticateToken } = require("../middleware/auth");
 const { getProducts } = require("../controller/getproducts");
@@ -73,7 +75,7 @@ router.get("/scrape-products", async (req, res) => {
     });
   }
 });
-router.get("/get-products", authenticateToken, async (req, res) => {
+router.get("/get-products", async (req, res) => {
   try {
     const products = await Product.findAll();
 
@@ -195,6 +197,67 @@ router.post("/create-product", upload.single('image'), async (req, res) => {
 
     return res.status(500).json({
       message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+router.get('/product-by-tag',async (req,res)=>{
+  try{
+    const  {tag}= req.query;
+    if (!tag) {
+      return res.status(400).json({
+        message: "Tag is required"
+      });
+    }
+     const products = await Product.findAll({
+      where: sequelize.where(
+        sequelize.cast(sequelize.col('tags'), 'text'),
+        {
+          [Op.like]: `%${tag}%`
+        }
+      )
+    });
+    if (!products || products.length === 0) {
+      return res.status(404).json({
+        message: "No products found for the specified tag",
+        data: []
+      });
+    }
+    return res.status(200).json({
+      message: "Products found successfully",
+      data: products
+    });
+  }catch(error){
+    console.error("Error fetching products by tag:", error);
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+})
+router.get('/product-by-id', async (req, res) => {
+  try {
+    const { id } = req.query;
+    if (!id) {
+      return res.status(400).json({
+        message: "Product ID is required"
+      });
+    }
+    const product = await Product.findByPk(id);
+    if (!product) {
+      return res.status(404).json({
+        message: "Product not found",
+        data: null
+      });
+    }
+    return res.status(200).json({
+      message: "Product found successfully",
+      data: product
+    });
+  } catch (error) {
+    console.error("Error fetching products by id:", error);
+    return res.status(500).json({
+      message: "Internal server error",
       error: error.message
     });
   }
