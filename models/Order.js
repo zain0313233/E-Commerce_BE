@@ -26,6 +26,25 @@ const Order = Sequelize.define(
         key: "id"
       }
     },
+    quantity: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+      validate: {
+        min: 1
+      }
+    },
+    shipping_address: {
+      type: DataTypes.TEXT,
+      allowNull: false
+    },
+    payment_method: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      validate: {
+        isIn: [["credit_card", "debit_card", "paypal", "cash_on_delivery", "bank_transfer"]]
+      }
+    },
     total_price: {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,

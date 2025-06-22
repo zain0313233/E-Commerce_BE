@@ -2,7 +2,7 @@ const express = require("express");
 const {User}=require('../models/User');
 const { authenticateToken } = require("../middleware/auth");
 const router = express.Router();
-const subpass = require("../config/supabase");
+const supabase = require("../config/subpass");
 const bcrypt = require('bcrypt');
 
 router.post("/signup", async (req, res) => {

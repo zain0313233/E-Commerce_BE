@@ -8,7 +8,11 @@ router.post('/create-order',async(req,res)=>{
         product_id,
         total_price,
         status,
+        payment_method,
+        shipping_address,
+        quantity,
         }=req.body;
+        
         if(!user_id || !product_id){
           return res.status(400).json({
             message:"user id and product id require",
@@ -19,6 +23,9 @@ router.post('/create-order',async(req,res)=>{
         product_id:product_id,
         total_price:total_price,
         status:status,
+        payment_method:payment_method,
+        shipping_address:shipping_address,
+        quantity:quantity,
         ordered_at:new Date(),
 
         })
