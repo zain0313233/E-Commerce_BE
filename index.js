@@ -6,6 +6,8 @@ const Productroutes=require('./routes/productrotes');
 const authroutes = require('./routes/authroutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const paymentRoutes =require('./routes/paymentRoutes.js');
+const { parseWebhookBody, rateLimitPayments } = require ('./middleware/stripe.js');
 require("dotenv").config();
 
 const app=express();
@@ -17,7 +19,9 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(parseWebhookBody);
 app.use('/api/auth',authroutes);
+app.use('/api/payments', rateLimitPayments(), paymentRoutes);
 app.use('/api/cart',cartRoutes);
 app.use('/api/order',orderRoutes);
 app.use('/api/product',Productroutes);
