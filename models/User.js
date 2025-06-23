@@ -8,15 +8,15 @@ const User = Sequelize.define('User', {
         autoIncrement: true,
     },
     name: {
-        type: DataTypes.STRING(100), 
+        type: DataTypes.STRING(100),
         allowNull: false,
         validate: {
             notEmpty: true,
-            len: [1, 100] 
+            len: [1, 100]
         }
     },
     email: {
-        type: DataTypes.STRING(150), 
+        type: DataTypes.STRING(150),
         allowNull: false,
         unique: true,
         validate: {
@@ -29,7 +29,6 @@ const User = Sequelize.define('User', {
         allowNull: true,
         validate: {
             customPasswordValidation(value) {
-               
                 if (value !== null && value !== undefined) {
                     if (value.length < 6) {
                         throw new Error('Password must be at least 6 characters long');
@@ -42,34 +41,82 @@ const User = Sequelize.define('User', {
         }
     },
     role: {
-        type: DataTypes.STRING(20), 
+        type: DataTypes.STRING(20),
         defaultValue: 'customer',
         allowNull: false,
         validate: {
             isIn: [['customer', 'admin', 'seller', 'moderator', 'support']]
         }
     },
+    address_line_1: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        validate: {
+            len: [0, 255]
+        }
+    },
+    address_line_2: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        validate: {
+            len: [0, 255]
+        }
+    },
+    city: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        validate: {
+            len: [0, 100]
+        }
+    },
+    state: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        validate: {
+            len: [0, 100]
+        }
+    },
+    postal_code: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        validate: {
+            len: [0, 20]
+        }
+    },
+    country: {
+        type: DataTypes.STRING(100),
+        allowNull: true,
+        defaultValue: 'Pakistan',
+        validate: {
+            len: [0, 100]
+        }
+    },
+    phone: {
+        type: DataTypes.STRING(20),
+        allowNull: true,
+        validate: {
+            len: [0, 20]
+        }
+    },
     created_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
-        field: 'created_at' 
+        field: 'created_at'
     },
     is_supabase_user: {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
-        allowNull: false,
-        comment: 'Indicates if user is using Supabase auth'
+        allowNull: false
     },
     supabase_id: {
         type: DataTypes.UUID,
         allowNull: true,
-        unique: true,
-        comment: 'Links to Supabase auth.users.id'
+        unique: true
     }
 }, {
     tableName: 'users',
-    timestamps: false, 
+    timestamps: false,
     schema: 'ecommerce',
     indexes: [
         {
@@ -85,6 +132,12 @@ const User = Sequelize.define('User', {
         },
         {
             fields: ['is_supabase_user']
+        },
+        {
+            fields: ['country']
+        },
+        {
+            fields: ['city']
         }
     ]
 });

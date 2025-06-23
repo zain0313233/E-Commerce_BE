@@ -7,7 +7,15 @@ const bcrypt = require('bcrypt');
 
 router.post("/signup", async (req, res) => {
   try {
- const { email, password, name, role } = req.body;
+ const { email, password, name, role,
+   address_line_1,
+    address_line_2,
+    city,
+    state,
+    postal_code,
+    country,
+    phone
+  } = req.body;
  if (!email || !password || !name) {
       return res.status(400).json({
         success: false,
@@ -54,6 +62,13 @@ router.post("/signup", async (req, res) => {
       email: email,
       password: hashedpassword,
       role: role || "customer",
+      address_line_1: address_line_1 || "",
+      address_line_2: address_line_2 || "",
+      city: city || "",
+      state: state || "",
+      postal_code: postal_code || "",
+      country: country || "",
+      phone: phone || "",
       is_supabase_user: true,
       created_at: new Date()
     })
