@@ -1,16 +1,16 @@
 
-import Stripe from 'stripe';
-import { VALIDATION_RULES, ERROR_MESSAGES } from '../config/paymentConfig.js';
+const Stripe =require('stripe');
+const { VALIDATION_RULES, ERROR_MESSAGES } = require('../config/paymentConfig');
 
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-10-16', 
 });
 
-export default stripe;
 
 
-export const validatePaymentIntent = (req, res, next) => {
+
+ const validatePaymentIntent = (req, res, next) => {
   const { amount, currency = 'usd' } = req.body;
 
   const errors = [];
@@ -34,7 +34,7 @@ export const validatePaymentIntent = (req, res, next) => {
 };
 
 
-export const validateCheckoutSession = (req, res, next) => {
+ const validateCheckoutSession = (req, res, next) => {
   const { items, customerEmail } = req.body;
 
   const errors = [];
@@ -77,7 +77,7 @@ export const validateCheckoutSession = (req, res, next) => {
 };
 
 
-export const parseWebhookBody = (req, res, next) => {
+ const parseWebhookBody = (req, res, next) => {
   if (req.path === '/webhook') {
    
     req.body = req.rawBody;
@@ -86,31 +86,31 @@ export const parseWebhookBody = (req, res, next) => {
 };
 
 
-export const dollarsToCents = (dollars) => {
+ const dollarsToCents = (dollars) => {
   return Math.round(dollars * 100);
 };
 
 
-export const centsToDollars = (cents) => {
+ const centsToDollars = (cents) => {
   return cents / 100;
 };
 
 
-export const formatAmount = (amount, currency = 'usd') => {
+ const formatAmount = (amount, currency = 'usd') => {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency.toUpperCase(),
   }).format(centsToDollars(amount));
 };
 
-export const generateOrderId = () => {
+ const generateOrderId = () => {
   const timestamp = Date.now().toString(36);
   const randomStr = Math.random().toString(36).substring(2, 8);
   return `order_${timestamp}_${randomStr}`;
 };
 
 
-export const validateWebhookSignature = (payload, signature, secret) => {
+const validateWebhookSignature = (payload, signature, secret) => {
   try {
     return stripe.webhooks.constructEvent(payload, signature, secret);
   } catch (error) {
@@ -119,7 +119,7 @@ export const validateWebhookSignature = (payload, signature, secret) => {
 };
 
 
-export const handleStripeError = (error, res) => {
+ const handleStripeError = (error, res) => {
   console.error('Stripe error:', error);
 
   switch (error.type) {
@@ -164,7 +164,7 @@ export const handleStripeError = (error, res) => {
 
 const rateLimitStore = new Map();
 
-export const rateLimitPayments = (windowMs = 15 * 60 * 1000, maxRequests = 10) => {
+ const rateLimitPayments = (windowMs = 15 * 60 * 1000, maxRequests = 10) => {
   return (req, res, next) => {
     const identifier = req.ip || req.connection.remoteAddress;
     const now = Date.now();
@@ -197,4 +197,17 @@ export const rateLimitPayments = (windowMs = 15 * 60 * 1000, maxRequests = 10) =
 
     next();
   };
+};
+
+module.exports = {
+  validatePaymentIntent,
+  validateCheckoutSession,
+  parseWebhookBody,
+  dollarsToCents,
+  centsToDollars,
+  formatAmount,
+  generateOrderId,
+  validateWebhookSignature,
+  handleStripeError,
+  rateLimitPayments
 };

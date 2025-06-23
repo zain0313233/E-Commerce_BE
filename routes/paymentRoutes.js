@@ -1,18 +1,10 @@
-import express from 'express';
-import { 
-  createPaymentIntent, 
-  getPaymentIntent,
-  createCheckoutSession,
-  getSession,
-  handleWebhook 
-} from '../controllers/paymentController.js';
+const express = require("express");
+const { getSession, handleWebhook } = require('../controller/paymentController');
 
 const router = express.Router();
 
-router.post('/create-payment-intent', createPaymentIntent);
-router.get('/payment-intent/:id', getPaymentIntent);
-router.post('/create-checkout-session', createCheckoutSession);
 router.get('/session/:session_id', getSession);
-router.post('/webhook', handleWebhook);
 
-export default router;
+router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+
+module.exports = router;

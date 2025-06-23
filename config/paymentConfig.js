@@ -1,4 +1,4 @@
-export const PAYMENT_CONFIG = {
+ const PAYMENT_CONFIG = {
   CURRENCIES: {
     USD: 'usd',
     EUR: 'eur',
@@ -38,7 +38,7 @@ export const PAYMENT_CONFIG = {
     RETURN: '/account/orders'
   }
 };
-export const VALIDATION_RULES = {
+ const VALIDATION_RULES = {
   email: {
     pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     message: 'Invalid email format'
@@ -56,7 +56,7 @@ export const VALIDATION_RULES = {
     message: 'Invalid items format'
   }
 };
-export const ERROR_MESSAGES = {
+ const ERROR_MESSAGES = {
   PAYMENT_FAILED: 'Payment processing failed. Please try again.',
   INVALID_AMOUNT: 'Invalid payment amount.',
   INVALID_ITEMS: 'Invalid or missing items.',
@@ -64,4 +64,10 @@ export const ERROR_MESSAGES = {
   WEBHOOK_VERIFICATION_FAILED: 'Webhook verification failed.',
   MISSING_REQUIRED_FIELDS: 'Missing required fields.',
   PAYMENT_ALREADY_PROCESSED: 'Payment has already been processed.'
+};
+
+module.exports = {
+  PAYMENT_CONFIG,
+  VALIDATION_RULES,
+  ERROR_MESSAGES
 };
