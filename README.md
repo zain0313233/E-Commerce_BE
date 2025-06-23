@@ -8,7 +8,7 @@ s
 
 - 🛍 Product management (CRUD)
 - 👤 User registration & login
-- 🔐 Password hashing with JWT authentication
+- 🔐 Password hashing with Subpass authentication
 - 🛒 Add to cart, update, delete items
 - 📦 Order creation and order history
 - ⭐ Product reviews with ratings
@@ -21,7 +21,7 @@ s
 
 - **Backend:** Node.js, Express.js
 - **Database:** PostgreSQL
-- **Authentication:** JWT
+- **Authentication:** Subpass
 - **ORM:** pg / node-postgres
 - **Image Hosting:** Bunny CDN
 - **Dev Tools:** dotenv, nodemon, bcrypt
