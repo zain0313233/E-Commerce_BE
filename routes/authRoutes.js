@@ -194,4 +194,50 @@ router.post('/signout', authenticateToken, async (req, res) => {
         });
     }
 });
+router.get('/profile/:id', authenticateToken, async (req, res) => {
+const userId = req.query.id || req.user.id;
+try{
+  if (!userId) {
+        return res.status(400).json({
+            success: false,
+            message: 'User ID is required'
+        });
+    }
+    const user= await User.findOne({
+        where: { id: userId },
+        attributes: ['id', 'name', 'email', 'role', 'address_line_1', 'address_line_2', 'city', 'state', 'postal_code', 'country', 'phone']
+    });
+    if (!user) {
+        return res.status(404).json({
+            success: false,
+            message: 'User profile not found'
+        });
+    }
+    return res.status(200).json({
+        success: true,
+        message: 'Profile fetched successfully',
+        user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            address_line_1: user.address_line_1,
+            address_line_2: user.address_line_2,
+            city: user.city,
+            state: user.state,
+            postal_code: user.postal_code,
+            country: user.country,
+            phone: user.phone
+        }
+    });
+
+}catch(error){
+    console.error('Error fetching profile:', error);
+    return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch profile',
+        error: error.message
+    });
+  }
+})
 module.exports = router;
