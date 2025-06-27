@@ -68,5 +68,77 @@ router.get('/get-all-cart/:id', async (req, res) => {
     });
   }
 });
+router.delete('/remove-item/:id', async (req, res) => {
+  try {
+      const { id } = req.params;
 
+      if (!id) {
+          return res.status(400).json({
+              message: "Cart Item ID required"
+          });
+      }
+
+      const cartItem = await CartItem.findByPk(id);
+
+      if (!cartItem) {
+          return res.status(404).json({
+              message: "Cart item not found"
+          });
+      }
+
+      await cartItem.destroy();
+
+      return res.status(200).json({
+          message: "Cart item removed successfully"
+      });
+
+  } catch (error) {
+      console.error('Error Occure', error);
+      return res.status(500).json({
+          message: "Internal server error",
+          error: error.message
+      });
+  }
+});
+
+router.put('/update-quantity', async (req, res) => {
+  try {
+      const { cart_id, quantity } = req.body;
+
+      if (!cart_id || !quantity) {
+          return res.status(400).json({
+              message: "Cart ID and quantity are required"
+          });
+      }
+
+      if (quantity < 1) {
+          return res.status(400).json({
+              message: "Quantity must be at least 1"
+          });
+      }
+
+      const cartItem = await CartItem.findByPk(cart_id);
+
+      if (!cartItem) {
+          return res.status(404).json({
+              message: "Cart item not found"
+          });
+      }
+
+      cartItem.quantity = quantity;
+      await cartItem.save();
+
+      return res.status(200).json({
+          message: "Cart item quantity updated successfully",
+          cartItem: cartItem
+      });
+
+  } catch (error) {
+      console.error('Error Occure', error);
+      return res.status(500).json({
+          message: "Internal server error",
+          error: error.message
+      });
+  }
+});
 module.exports=router;
