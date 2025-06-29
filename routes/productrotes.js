@@ -262,4 +262,98 @@ router.get('/product-by-id', async (req, res) => {
     });
   }
 });
+router.get('/get-by-category/:name', async (req, res) => {
+  try {
+    const { name } = req.params;
+    
+    console.log(`Received request for category: ${name}`);
+  
+    if (!name || name.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a category name'
+      });
+    }
+
+    const searchTerm = name.trim().toLowerCase();
+    console.log(`Searching for: ${searchTerm}`);
+
+  
+    if (!Product) {
+      throw new Error('Product model is not defined');
+    }
+
+ 
+    await Product.findOne({ limit: 1 });
+    console.log('Database connection successful');
+
+  
+    const products = await Product.findAll({
+      where: {
+        [Op.or]: [
+          
+          {
+            category: {
+              [Op.iLike]: `%${searchTerm}%`
+            }
+          },
+         
+          {
+            title: {
+              [Op.iLike]: `%${searchTerm}%`
+            }
+          },
+         
+          {
+            brand: {
+              [Op.iLike]: `%${searchTerm}%`
+            }
+          }
+        
+        ]
+      },
+      order: [
+        ['created_at', 'DESC'],
+        ['rating', 'DESC']
+      ]
+    });
+
+    console.log(`Found ${products.length} products`);
+  
+    
+    res.status(200).json({
+      success: true,
+      message: products.length > 0 
+        ? `Found ${products.length} products for category: ${name}`
+        : `No products found for category: ${name}`,
+      data: products,
+      count: products.length,
+      searchTerm: name
+    });
+
+  } catch (error) {
+  
+    console.error('Error occurred while fetching products by category:');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+  
+    if (error.name === 'SequelizeConnectionError') {
+      console.error('Database connection error');
+    } else if (error.name === 'SequelizeDatabaseError') {
+      console.error('Database query error');
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error while fetching products',
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      } : undefined
+    });
+  }
+});
+
 module.exports = router;
