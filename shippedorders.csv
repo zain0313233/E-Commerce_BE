@@ -1,0 +1,7 @@
+id,user_id,product_id,quantity,shipping_address,payment_method,total_price,status,ordered_at
+8,3,7,1,"123 Main St, City, Country",credit_card,129.99,shipped,2025-06-27T13:32:46.576Z
+7,3,86,1,"123 Main St, City, Country",credit_card,19.99,shipped,2025-06-27T03:09:39.163Z
+6,3,91,1,"123 Main St, City, Country",credit_card,119.99,processing,2025-06-27T02:44:53.535Z
+5,1,1,1,"123 Main St, City, Country",credit_card,9.99,processing,2025-06-27T02:36:51.332Z
+4,1,1,1,"123 Main St, City, Country",credit_card,9.99,delivered,2025-06-23T03:43:43.190Z
+3,1,1,1,"123 Main St, City, Country",credit_card,9.99,delivered,2025-06-22T04:35:14.581Z

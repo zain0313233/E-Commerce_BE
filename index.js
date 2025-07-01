@@ -7,6 +7,7 @@ const authroutes = require('./routes/authroutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const paymentRoutes =require('./routes/paymentRoutes.js');
+const {getshippedOrders}=require('./controller/ordertraking.js');
 const { parseWebhookBody, rateLimitPayments } = require ('./middleware/stripe.js');
 require("dotenv").config();
 
@@ -25,6 +26,7 @@ app.use('/api/payments', rateLimitPayments(), paymentRoutes);
 app.use('/api/cart',cartRoutes);
 app.use('/api/order',orderRoutes);
 app.use('/api/product',Productroutes);
+getshippedOrders();
 app.use('/api/health',(req,res)=>{
     res.status(200).json({
         status:"ok",

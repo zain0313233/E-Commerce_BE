@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const sequelize = require('../config/db');
 const multer = require("multer");
+const  axios=require("axios");
 const { Op } = require('sequelize');
 const path = require("path");
 const { authenticateToken } = require("../middleware/auth");
@@ -22,7 +23,7 @@ const upload = multer({
     fileSize: 10 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startWith("image/")) {
+    if (file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
       cb(new Error("Only image files are allowed!"), false);
@@ -32,7 +33,7 @@ const upload = multer({
 
 async function uploadToBunny(buffer, fileName){
   try {
-    const response  = await axiox.put(
+    const response  = await axios.put(
       `${BUNNY_CONFIG.storageUrl}/${BUNNY_CONFIG.storageZoneName}/${fileName}`,
       buffer,
       {
@@ -355,5 +356,34 @@ router.get('/get-by-category/:name', async (req, res) => {
     });
   }
 });
+
+router.get('/get-new-products', async (req, res) => {
+  try {
+    const products = await Product.findAll({
+     order: [
+        ['created_at', 'DESC'],
+        ['rating', 'DESC']
+      ]
+    });
+
+    if (!products || products.length === 0) {
+      return res.status(404).json({
+        message: "No products found",
+        data: []
+      });
+    }
+
+    return res.status(200).json({
+      message: "Products found successfully",
+      data: products
+    });
+  } catch (error) {
+    console.error("Error fetching products:", error);
+    return res.status(500).json({
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+})
 
 module.exports = router;
