@@ -104,6 +104,7 @@ const trackOrder = () => {
     console.error("error occure ", error);
   }
 };
+// this function is for practice write stream
 const getshippedOrders = async () => {
   try {
     const orders = await Order.findAll({
