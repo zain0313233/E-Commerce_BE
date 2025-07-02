@@ -32,7 +32,7 @@ const parseCSVLine = (line) => {
   result.push(current.trim());
   return result;
 };
-const trackOrder = () => {
+const UpdateOrder = () => {
   try {
     const filePath =
       "C:\\Users\\HP\\Documents\\App Development\\My Projects\\E-Commerce_BE\\shippedorders.csv";
@@ -201,6 +201,6 @@ const writeOrdersToCSVWithStream = async (orders) => {
   }
 };
 module.exports = {
-  trackOrder,
+  UpdateOrder,
   getshippedOrders
 };

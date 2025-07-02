@@ -1,5 +1,6 @@
 const stripe = require("../middleware/stripe.js");
 const { Order } = require("../models/Order");
+// this controller is not in use now but in future
 
 const getSession = async (req, res) => {
   const { session_id } = req.params;
