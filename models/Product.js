@@ -25,7 +25,7 @@ const Product = Sequelize.define('Product', {
     allowNull: true
   },
   category: {
-    type: DataTypes.STRING(100),
+    type: DataTypes.TEXT,
     allowNull: true
   },
   brand: {

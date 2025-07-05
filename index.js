@@ -8,6 +8,7 @@ const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const paymentRoutes =require('./routes/paymentRoutes.js');
 const {getshippedOrders,UpdateOrder}=require('./controller/ordertraking.js');
+const {getproductfromcsv}=require('./controller/getproducts.js')
 const { parseWebhookBody, rateLimitPayments } = require ('./middleware/stripe.js');
 require("dotenv").config();
 
@@ -28,6 +29,7 @@ app.use('/api/order',orderRoutes);
 app.use('/api/product',Productroutes);
 // UpdateOrder();
 // getshippedOrders();
+getproductfromcsv();
 app.use('/api/health',(req,res)=>{
     res.status(200).json({
         status:"ok",
