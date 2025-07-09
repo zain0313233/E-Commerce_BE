@@ -9,6 +9,8 @@ const { authenticateToken } = require("../middleware/auth");
 const { getProducts } = require("../controller/getproducts");
 const { Product } = require("../models/product");
 const { headers } = require("../config/subpass");
+const cloudinary = require("cloudinary").v2;
+
 const BUNNY_CONFIG = {
   storageZoneName: process.env.BUNNY_STORAGE_ZONE_NAME || "1083770",
   storagePassword: process.env.BUNNY_STORAGE_PASSWORD,
@@ -30,29 +32,29 @@ const upload = multer({
     }
   }
 });
-
-async function uploadToBunny(buffer, fileName){
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+const uploadImageTocloudinary = async (buffer, fileName) => {
   try {
-    const response  = await axios.put(
-      `${BUNNY_CONFIG.storageUrl}/${BUNNY_CONFIG.storageZoneName}/${fileName}`,
-      buffer,
-      {
-        headers: {
-          AccessKey: BUNNY_CONFIG.storagePassword,
-          "Content-Type": "application/octet-stream"
-        }
-      }
-    );
-    if (response.status===201){
-      return `${BUNNY_CONFIG.pullZoneUrl}/${fileName}`;
-    } else {
-      throw new Error('Failed to upload to Bunny CDN');
-    }
+    const base64Data = buffer.toString("base64");
+    const dataUri = `data:image/jpeg;base64,${base64Data}`;
+    const result = await cloudinary.uploader.upload(dataUri, {
+      public_id: fileName,
+      resource_type: "image"
+    });
+    return result.secure_url;
   } catch (error) {
-    console.error("Bunny CDN upload error:", error);
-    throw error;
+    if (error.http_code === 404) {
+      return 404;
+    }
+    console.error("Cloudinary upload error:", error);
+    return null;
   }
 };
+
 
 function generateFilename(originalName) {
   const timestamp = Date.now();
@@ -99,12 +101,12 @@ router.get("/get-products", async (req, res) => {
     });
   }
 });
-router.get("/user-products", authenticateToken, async (req, res) => {
+router.get("/user-products/:id", async (req, res) => {
   try {
-    const user_id = req.user.id || req.user.user_id;
+    const {id } = req.params; 
 
     const products = await Product.findAll({
-      where: { userid: user_id }
+      where: { user_id: id }
     });
 
     if (!products || products.length === 0) {
@@ -149,7 +151,7 @@ router.post("/create-product", upload.single('image'), async (req, res) => {
    if (req.file){
     const fileName= await generateFilename(req.file.originalname);
     try{
-         image_url = await uploadToBunny(req.file.buffer, fileName);
+         image_url = await uploadImageTocloudinary(req.file.buffer, fileName);
     }catch (uploadError) {   
         console.error('Image upload failed:', uploadError);
         return res.status(500).json({

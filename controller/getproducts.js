@@ -187,6 +187,11 @@ const getproductfromcsv = async () => {
   try {
     console.log("Starting CSV download from Google Drive...");
     const downloadedFiles = await downloadCSVFromDrive();
+    // const downloadedFiles = [
+    //   // 'C:\\Users\\HP\\Documents\\App Development\\My Projects\\E-Commerce_BE\\productfiles\\Procuct3.csv',
+    //   // "C:\\Users\\HP\\Documents\\App Development\\My Projects\\E-Commerce_BE\\productfiles\\productone.csv"
+    //   "C:\\Users\\HP\\Documents\\App Development\\My Projects\\E-Commerce_BE\\productfiles\\producttwo.csv"
+    // ];
 
     for (const filePath of downloadedFiles) {
       const fileName = path.basename(filePath);

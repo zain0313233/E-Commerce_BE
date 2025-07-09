@@ -29,7 +29,7 @@ app.use('/api/order',orderRoutes);
 app.use('/api/product',Productroutes);
 // UpdateOrder();
 // getshippedOrders();
-getproductfromcsv();
+// getproductfromcsv();
 app.use('/api/health',(req,res)=>{
     res.status(200).json({
         status:"ok",
