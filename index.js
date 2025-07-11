@@ -6,7 +6,7 @@ const Productroutes=require('./routes/productrotes');
 const authroutes = require('./routes/authroutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
-const paymentRoutes =require('./routes/paymentRoutes.js');
+// const paymentRoutes =require('./routes/paymentRoutes.js');
 const {getshippedOrders,UpdateOrder}=require('./controller/ordertraking.js');
 const {getproductfromcsv}=require('./controller/getproducts.js')
 const { parseWebhookBody, rateLimitPayments } = require ('./middleware/stripe.js');
@@ -23,7 +23,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(parseWebhookBody);
 app.use('/api/auth',authroutes);
-app.use('/api/payments', rateLimitPayments(), paymentRoutes);
+// app.use('/api/payments', rateLimitPayments(), paymentRoutes);
 app.use('/api/cart',cartRoutes);
 app.use('/api/order',orderRoutes);
 app.use('/api/product',Productroutes);
