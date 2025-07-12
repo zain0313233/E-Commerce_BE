@@ -1,10 +1,11 @@
-const express = require("express");
-const { getSession, handleWebhook } = require('../controller/paymentController');
+// not in used fro now
+// const express = require("express");
+// const { getSession, handleWebhook } = require('../controller/paymentController');
 
-const router = express.Router();
+// const router = express.Router();
 
-router.get('/session/:session_id', getSession);
+// router.get('/session/:session_id', getSession);
 
-router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
+// router.post('/webhook', express.raw({ type: 'application/json' }), handleWebhook);
 
-module.exports = router;
+// module.exports = router;
