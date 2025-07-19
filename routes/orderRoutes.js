@@ -1,10 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const Stripe =require('stripe');
+const { authenticateToken } = require("../middleware/auth");
 const { Order } = require("../models/Order");
+const { getSession, handleWebhook } = require("../controller/paymentController");
 
 
-router.post("/create-order", async (req, res) => {
+router.post("/create-order", authenticateToken ,async (req, res) => {
   try {
     const {
       user_id,
@@ -106,7 +108,12 @@ router.post("/create-order", async (req, res) => {
   }
 });
 
-router.get("/get-orders/:id", async (req, res) => {
+router.get("/session/:session_id", getSession);
+
+
+router.post("/webhook", handleWebhook);
+
+router.get("/get-orders/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -141,7 +148,7 @@ router.get("/get-orders/:id", async (req, res) => {
   }
 });
 
-router.get("/get-order", async (req, res) => {
+router.get("/get-order", authenticateToken, async (req, res) => {
   try {
     const { order_id, user_id } = req.query;
 
@@ -179,7 +186,7 @@ router.get("/get-order", async (req, res) => {
 });
 
 
-router.put("/update-order-status", async (req, res) => {
+router.put("/update-order-status", authenticateToken ,async (req, res) => {
   try {
     const { stripe_session_id, status, payment_status } = req.body;
 

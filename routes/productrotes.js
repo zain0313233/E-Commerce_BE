@@ -11,6 +11,7 @@ const { Product } = require("../models/product");
 const { headers } = require("../config/subpass");
 const cloudinary = require("cloudinary").v2;
 
+
 const BUNNY_CONFIG = {
   storageZoneName: process.env.BUNNY_STORAGE_ZONE_NAME || "1083770",
   storagePassword: process.env.BUNNY_STORAGE_PASSWORD,
@@ -78,7 +79,7 @@ router.get("/scrape-products", async (req, res) => {
     });
   }
 });
-router.get("/get-products", async (req, res) => {
+router.get("/get-products", authenticateToken, async (req, res) => {
   try {
     const products = await Product.findAll();
 
@@ -101,7 +102,7 @@ router.get("/get-products", async (req, res) => {
     });
   }
 });
-router.get("/user-products/:id", async (req, res) => {
+router.get("/user-products/:id", authenticateToken, async (req, res) => {
   try {
     const {id } = req.params; 
 
@@ -128,7 +129,7 @@ router.get("/user-products/:id", async (req, res) => {
     });
   }
 });
-router.post("/create-product", upload.single('image'), async (req, res) => {
+router.post("/create-product", authenticateToken, upload.single('image'), async (req, res) => {
   try {
     const {
       user_id,
@@ -204,7 +205,7 @@ router.post("/create-product", upload.single('image'), async (req, res) => {
     });
   }
 });
-router.get('/product-by-tag',async (req,res)=>{
+router.get('/product-by-tag', authenticateToken, async (req,res)=>{
   try{
     const  {tag}= req.query;
     if (!tag) {
@@ -238,7 +239,7 @@ router.get('/product-by-tag',async (req,res)=>{
     });
   }
 })
-router.get('/product-by-id', async (req, res) => {
+router.get('/product-by-id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.query;
     if (!id) {
@@ -265,7 +266,7 @@ router.get('/product-by-id', async (req, res) => {
     });
   }
 });
-router.get('/get-by-category/:name', async (req, res) => {
+router.get('/get-by-category/:name', authenticateToken, async (req, res) => {
   try {
     const { name } = req.params;
     
@@ -359,7 +360,7 @@ router.get('/get-by-category/:name', async (req, res) => {
   }
 });
 
-router.get('/get-new-products', async (req, res) => {
+router.get('/get-new-products', authenticateToken, async (req, res) => {
   try {
     const products = await Product.findAll({
      order: [
