@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const sequelize = require('../config/db');
 const multer = require("multer");
-const  axios=require("axios");
+const axios = require("axios");
 const { Op } = require('sequelize');
 const path = require("path");
 const { authenticateToken } = require("../middleware/auth");
@@ -10,7 +10,13 @@ const { getProducts } = require("../controller/getproducts");
 const { Product } = require("../models/product");
 const { headers } = require("../config/subpass");
 const cloudinary = require("cloudinary").v2;
+const NodeCache = require("node-cache");
 
+const cache = new NodeCache({ 
+  stdTTL: 300,
+  checkperiod: 60,
+  useClones: false
+});
 
 const BUNNY_CONFIG = {
   storageZoneName: process.env.BUNNY_STORAGE_ZONE_NAME || "1083770",
@@ -33,11 +39,13 @@ const upload = multer({
     }
   }
 });
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
 const uploadImageTocloudinary = async (buffer, fileName) => {
   try {
     const base64Data = buffer.toString("base64");
@@ -56,7 +64,6 @@ const uploadImageTocloudinary = async (buffer, fileName) => {
   }
 };
 
-
 function generateFilename(originalName) {
   const timestamp = Date.now();
   const randomString = Math.random().toString(36).substring(2, 15);
@@ -67,6 +74,7 @@ function generateFilename(originalName) {
 router.get("/scrape-products", async (req, res) => {
   try {
     const result = await getProducts();
+    cache.flushAll();
     return res.status(200).json({
       message: "Products scraped and stored successfully",
       data: result
@@ -79,9 +87,28 @@ router.get("/scrape-products", async (req, res) => {
     });
   }
 });
+
 router.get("/get-products", authenticateToken, async (req, res) => {
   try {
-    const products = await Product.findAll();
+    const { limit = 20, offset = 0 } = req.query;
+    const cacheKey = `products_all_${limit}_${offset}`;
+    
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        message: "Products found successfully",
+        data: cachedData.products,
+        total: cachedData.total,
+        cached: true
+      });
+    }
+
+    const { count, rows: products } = await Product.findAndCountAll({
+      attributes: ['id', 'title', 'description', 'price', 'discount_percentage', 'category', 'brand', 'image_url', 'stock_quantity', 'rating', 'tags', 'created_at'],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [['created_at', 'DESC']]
+    });
 
     if (!products || products.length === 0) {
       return res.status(404).json({
@@ -90,9 +117,13 @@ router.get("/get-products", authenticateToken, async (req, res) => {
       });
     }
 
+    const responseData = { products, total: count };
+    cache.set(cacheKey, responseData);
+
     return res.status(200).json({
       message: "Products found successfully",
-      data: products
+      data: products,
+      total: count
     });
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -102,12 +133,29 @@ router.get("/get-products", authenticateToken, async (req, res) => {
     });
   }
 });
+
 router.get("/user-products/:id", authenticateToken, async (req, res) => {
   try {
-    const {id } = req.params; 
+    const { id } = req.params;
+    const { limit = 20, offset = 0 } = req.query;
+    const cacheKey = `products_user_${id}_${limit}_${offset}`;
 
-    const products = await Product.findAll({
-      where: { user_id: id }
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        message: "Products found successfully",
+        data: cachedData.products,
+        total: cachedData.total,
+        cached: true
+      });
+    }
+
+    const { count, rows: products } = await Product.findAndCountAll({
+      where: { user_id: id },
+      attributes: ['id', 'title', 'description', 'price', 'discount_percentage', 'category', 'brand', 'image_url', 'stock_quantity', 'rating', 'tags', 'created_at'],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [['created_at', 'DESC']]
     });
 
     if (!products || products.length === 0) {
@@ -117,9 +165,13 @@ router.get("/user-products/:id", authenticateToken, async (req, res) => {
       });
     }
 
+    const responseData = { products, total: count };
+    cache.set(cacheKey, responseData);
+
     return res.status(200).json({
       message: "Products found successfully",
-      data: products
+      data: products,
+      total: count
     });
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -129,6 +181,7 @@ router.get("/user-products/:id", authenticateToken, async (req, res) => {
     });
   }
 });
+
 router.post("/create-product", authenticateToken, upload.single('image'), async (req, res) => {
   try {
     const {
@@ -143,17 +196,19 @@ router.post("/create-product", authenticateToken, upload.single('image'), async 
       rating,
       tags
     } = req.body;
+    
     if (!title || !price || !user_id) {
       return res.status(400).json({
         message: 'Title and price and User id are required fields'
       });
     }
+    
     let image_url;
-   if (req.file){
-    const fileName= await generateFilename(req.file.originalname);
-    try{
-         image_url = await uploadImageTocloudinary(req.file.buffer, fileName);
-    }catch (uploadError) {   
+    if (req.file) {
+      const fileName = await generateFilename(req.file.originalname);
+      try {
+        image_url = await uploadImageTocloudinary(req.file.buffer, fileName);
+      } catch (uploadError) {
         console.error('Image upload failed:', uploadError);
         return res.status(500).json({
           message: 'Failed to upload image',
@@ -161,7 +216,8 @@ router.post("/create-product", authenticateToken, upload.single('image'), async 
         });
       }
     }
-     let parsedTags = null;
+    
+    let parsedTags = null;
     if (tags) {
       try {
         parsedTags = typeof tags === 'string' ? JSON.parse(tags) : tags;
@@ -169,6 +225,7 @@ router.post("/create-product", authenticateToken, upload.single('image'), async 
         parsedTags = Array.isArray(tags) ? tags : [tags];
       }
     }
+    
     const newProduct = await Product.create({
       title,
       description,
@@ -180,15 +237,18 @@ router.post("/create-product", authenticateToken, upload.single('image'), async 
       rating: rating ? parseFloat(rating) : null,
       tags: parsedTags,
       image_url,
-      thumbnail_url: null, 
+      thumbnail_url: null,
       user_id
     });
+
+    cache.flushAll();
+
     return res.status(201).json({
-      message:"Product Created S uccessfully",
-      product:newProduct
-    })
+      message: "Product Created Successfully",
+      product: newProduct
+    });
   } catch (error) {
-      console.error('Error creating product:', error);
+    console.error('Error creating product:', error);
     if (error.name === 'SequelizeValidationError') {
       return res.status(400).json({
         message: 'Validation error',
@@ -205,55 +265,100 @@ router.post("/create-product", authenticateToken, upload.single('image'), async 
     });
   }
 });
-router.get('/product-by-tag', authenticateToken, async (req,res)=>{
-  try{
-    const  {tag}= req.query;
+
+router.get('/product-by-tag', authenticateToken, async (req, res) => {
+  try {
+    const { tag, limit = 20, offset = 0 } = req.query;
+    
     if (!tag) {
       return res.status(400).json({
         message: "Tag is required"
       });
     }
-     const products = await Product.findAll({
+
+    const cacheKey = `products_tag_${tag}_${limit}_${offset}`;
+    const cachedData = cache.get(cacheKey);
+    
+    if (cachedData) {
+      return res.status(200).json({
+        message: "Products found successfully",
+        data: cachedData.products,
+        total: cachedData.total,
+        cached: true
+      });
+    }
+
+    const { count, rows: products } = await Product.findAndCountAll({
       where: sequelize.where(
         sequelize.cast(sequelize.col('tags'), 'text'),
         {
           [Op.like]: `%${tag}%`
         }
-      )
+      ),
+      attributes: ['id', 'title', 'description', 'price', 'discount_percentage', 'category', 'brand', 'image_url', 'stock_quantity', 'rating', 'tags', 'created_at'],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [['created_at', 'DESC']]
     });
+    
     if (!products || products.length === 0) {
       return res.status(404).json({
         message: "No products found for the specified tag",
         data: []
       });
     }
+
+    const responseData = { products, total: count };
+    cache.set(cacheKey, responseData);
+
     return res.status(200).json({
       message: "Products found successfully",
-      data: products
+      data: products,
+      total: count
     });
-  }catch(error){
+  } catch (error) {
     console.error("Error fetching products by tag:", error);
     return res.status(500).json({
       message: "Internal server error",
       error: error.message
     });
   }
-})
+});
+
 router.get('/product-by-id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.query;
+    
     if (!id) {
       return res.status(400).json({
         message: "Product ID is required"
       });
     }
-    const product = await Product.findByPk(id);
+
+    const cacheKey = `product_${id}`;
+    const cachedData = cache.get(cacheKey);
+    
+    if (cachedData) {
+      return res.status(200).json({
+        message: "Product found successfully",
+        data: cachedData,
+        cached: true
+      });
+    }
+
+    const product = await Product.findByPk(id, {
+      attributes: ['id', 'title', 'description', 'price', 'discount_percentage', 'category', 'brand', 'image_url', 'stock_quantity', 'rating', 'tags', 'created_at']
+    });
+    
     if (!product) {
       return res.status(404).json({
         message: "Product not found",
         data: null
       });
     }
+
+    cache.set(cacheKey, product);
+
     return res.status(200).json({
       message: "Product found successfully",
       data: product
@@ -266,12 +371,12 @@ router.get('/product-by-id', authenticateToken, async (req, res) => {
     });
   }
 });
+
 router.get('/get-by-category/:name', authenticateToken, async (req, res) => {
   try {
     const { name } = req.params;
+    const { limit = 20, offset = 0 } = req.query;
     
-    console.log(`Received request for category: ${name}`);
-  
     if (!name || name.trim() === '') {
       return res.status(400).json({
         success: false,
@@ -280,73 +385,66 @@ router.get('/get-by-category/:name', authenticateToken, async (req, res) => {
     }
 
     const searchTerm = name.trim().toLowerCase();
-    console.log(`Searching for: ${searchTerm}`);
-
-  
-    if (!Product) {
-      throw new Error('Product model is not defined');
+    const cacheKey = `products_category_${searchTerm}_${limit}_${offset}`;
+    
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        success: true,
+        message: cachedData.products.length > 0 
+          ? `Found ${cachedData.total} products for category: ${name}`
+          : `No products found for category: ${name}`,
+        data: cachedData.products,
+        count: cachedData.total,
+        searchTerm: name,
+        cached: true
+      });
     }
 
- 
-    await Product.findOne({ limit: 1 });
-    console.log('Database connection successful');
-
-  
-    const products = await Product.findAll({
+    const { count, rows: products } = await Product.findAndCountAll({
       where: {
         [Op.or]: [
-          
           {
             category: {
               [Op.iLike]: `%${searchTerm}%`
             }
           },
-         
           {
             title: {
               [Op.iLike]: `%${searchTerm}%`
             }
           },
-         
           {
             brand: {
               [Op.iLike]: `%${searchTerm}%`
             }
           }
-        
         ]
       },
+      attributes: ['id', 'title', 'description', 'price', 'discount_percentage', 'category', 'brand', 'image_url', 'stock_quantity', 'rating', 'tags', 'created_at'],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
       order: [
         ['created_at', 'DESC'],
         ['rating', 'DESC']
       ]
     });
 
-    console.log(`Found ${products.length} products`);
-  
-    
+    const responseData = { products, total: count };
+    cache.set(cacheKey, responseData);
+
     res.status(200).json({
       success: true,
       message: products.length > 0 
-        ? `Found ${products.length} products for category: ${name}`
+        ? `Found ${count} products for category: ${name}`
         : `No products found for category: ${name}`,
       data: products,
-      count: products.length,
+      count: count,
       searchTerm: name
     });
 
   } catch (error) {
-  
-    console.error('Error occurred while fetching products by category:');
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
-    
-  
-    if (error.name === 'SequelizeConnectionError') {
-      console.error('Database connection error');
-    } else if (error.name === 'SequelizeDatabaseError') {
-      console.error('Database query error');
-    }
+    console.error('Error occurred while fetching products by category:', error);
     
     res.status(500).json({
       success: false,
@@ -362,8 +460,24 @@ router.get('/get-by-category/:name', authenticateToken, async (req, res) => {
 
 router.get('/get-new-products', authenticateToken, async (req, res) => {
   try {
-    const products = await Product.findAll({
-     order: [
+    const { limit = 20, offset = 0 } = req.query;
+    const cacheKey = `products_new_${limit}_${offset}`;
+    
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) {
+      return res.status(200).json({
+        message: "Products found successfully",
+        data: cachedData.products,
+        total: cachedData.total,
+        cached: true
+      });
+    }
+
+    const { count, rows: products } = await Product.findAndCountAll({
+      attributes: ['id', 'title', 'description', 'price', 'discount_percentage', 'category', 'brand', 'image_url', 'stock_quantity', 'rating', 'tags', 'created_at'],
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [
         ['created_at', 'DESC'],
         ['rating', 'DESC']
       ]
@@ -376,9 +490,13 @@ router.get('/get-new-products', authenticateToken, async (req, res) => {
       });
     }
 
+    const responseData = { products, total: count };
+    cache.set(cacheKey, responseData);
+
     return res.status(200).json({
       message: "Products found successfully",
-      data: products
+      data: products,
+      total: count
     });
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -387,6 +505,6 @@ router.get('/get-new-products', authenticateToken, async (req, res) => {
       error: error.message
     });
   }
-})
+});
 
 module.exports = router;
