@@ -4,7 +4,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const pino = require('pino');
 const pinoHttp = require('pino-http');
-
+const { createServer } = require('http');
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -21,7 +21,6 @@ const logger = pino({
     environment: process.env.NODE_ENV || 'development'
   }
 });
-
 
 const httpLogger = pinoHttp({
   logger,
@@ -53,13 +52,14 @@ const Productroutes = require('./routes/productrotes');
 const authroutes = require('./routes/authroutes');
 const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
-// const paymentRoutes = require('./routes/paymentRoutes.js');
 const { getshippedOrders, UpdateOrder } = require('./controller/ordertraking.js');
 const { getproductfromcsv } = require('./controller/getproducts.js');
 const { parseWebhookBody, rateLimitPayments } = require('./middleware/stripe.js');
+const { initializeSocket } = require('./socket/socketServer');
 
 const app = express();
-
+const server = createServer(app);
+const io = initializeSocket(server);
 
 app.use(httpLogger);
 
@@ -89,14 +89,13 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(parseWebhookBody); 
 
-
 app.use((req, res, next) => {
   req.logger = logger;
+  req.io = io;
   next();
 });
 
 app.use('/api/auth', authroutes);
-// app.use('/api/payments', rateLimitPayments(), paymentRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);
 app.use('/api/product', Productroutes);
@@ -110,7 +109,6 @@ app.use('/api/health', (req, res) => {
   });
 });
 
-
 app.use((req, res) => {
   req.log.warn({ path: req.path, method: req.method }, 'Route not found');
   res.status(404).json({
@@ -118,7 +116,6 @@ app.use((req, res) => {
     message: 'Route not found'
   });
 });
-
 
 app.use((error, req, res, next) => {
   const errorId = Date.now().toString(36) + Math.random().toString(36).substr(2);
@@ -139,7 +136,6 @@ app.use((error, req, res, next) => {
   });
 });
 
-
 async function initializeDatabase() {
   try {
     await testConnection();
@@ -149,7 +145,6 @@ async function initializeDatabase() {
     process.exit(1);
   }
 }
-
 
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
@@ -164,10 +159,9 @@ process.on('SIGINT', () => {
 initializeDatabase();
 
 const PORT = process.env.PORT || 3001;
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
   logger.info({ port: PORT, env: process.env.NODE_ENV }, 'Server started successfully');
 });
-
 
 server.on('error', (error) => {
   logger.error({ err: error }, 'Server error occurred');
