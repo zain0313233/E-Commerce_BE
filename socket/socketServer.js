@@ -39,6 +39,39 @@ function initializeSocket(server) {
       });
     });
 
+    socket.on('send_message', (data) => {
+      const userInfo = connectedUsers.get(socket.id);
+      
+      if (!userInfo) {
+        socket.emit('error', { message: 'User not in any chat room' });
+        return;
+      }
+
+      const messageData = {
+        id: Date.now() + Math.random(),
+        message: data.message,
+        senderId: userInfo.userId,
+        senderType: userInfo.userType,
+        timestamp: new Date().toISOString(),
+        roomId: userInfo.roomId
+      };
+
+      io.to(userInfo.roomId).emit('receive_message', messageData);
+      
+      console.log('Message sent in room:', userInfo.roomId, messageData);
+    });
+
+    socket.on('typing', (data) => {
+      const userInfo = connectedUsers.get(socket.id);
+      if (userInfo) {
+        socket.to(userInfo.roomId).emit('user_typing', {
+          userId: userInfo.userId,
+          userType: userInfo.userType,
+          isTyping: data.isTyping
+        });
+      }
+    });
+
     socket.on('disconnect', () => {
       const userInfo = connectedUsers.get(socket.id);
       if (userInfo) {
