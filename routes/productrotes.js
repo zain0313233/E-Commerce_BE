@@ -347,7 +347,7 @@ router.get('/product-by-id', authenticateToken, async (req, res) => {
     }
 
     const product = await Product.findByPk(id, {
-      attributes: ['id', 'title', 'description', 'price', 'discount_percentage', 'category', 'brand', 'image_url', 'stock_quantity', 'rating', 'tags', 'created_at']
+      attributes: ['id', 'title', 'description', 'price', 'discount_percentage', 'category', 'brand', 'image_url', 'stock_quantity', 'rating', 'tags', 'created_at','user_id']
     });
     
     if (!product) {
