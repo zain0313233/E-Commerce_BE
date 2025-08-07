@@ -26,19 +26,22 @@ function initializeSocket(server) {
         socketId: socket.id
       });
       
+      // Update or set the socket mapping
       userSockets.set(userId, socket.id);
       
-      console.log(`${userType} ${userId} registered`);
+      console.log(`${userType} ${userId} registered with socket ${socket.id}`);
+      console.log('Active users:', Array.from(userSockets.keys()));
     });
 
     socket.on('join_chat', (data) => {
       const { userId, userType, supportUserId } = data;
-      let roomId;
       
+      // Create consistent room ID format
+      let roomId;
       if (userType === 'customer') {
         roomId = `chat_${supportUserId}_${userId}`;
-      } else {
-        roomId = `chat_${supportUserId}_${userId}`; // Keep consistent format
+      } else if (userType === 'seller') {
+        roomId = `chat_${userId}_${supportUserId}`;
       }
       
       socket.join(roomId);
@@ -47,6 +50,7 @@ function initializeSocket(server) {
       socket.roomId = roomId;
       socket.supportUserId = supportUserId;
       
+      // Update user info with room details
       connectedUsers.set(socket.id, {
         userId,
         userType,
@@ -57,25 +61,40 @@ function initializeSocket(server) {
 
       console.log(`${userType} ${userId} joined room: ${roomId}`);
       
-      // If customer joins, notify the seller specifically
+      // If customer joins, notify the seller
       if (userType === 'customer') {
-        console.log(`Notifying seller ${supportUserId} about new chat from customer ${userId}`);
+        console.log(`Looking for seller ${supportUserId}...`);
+        console.log('Available sellers:', Array.from(userSockets.entries()));
         
-        // Check if seller is online
         const sellerSocketId = userSockets.get(supportUserId);
         if (sellerSocketId) {
-          io.to(sellerSocketId).emit('new_chat_request', {
-            customerId: userId,
-            supportUserId: supportUserId,
-            roomId: roomId,
-            message: `New chat request from customer ${userId}`
-          });
-          console.log(`Notification sent to seller ${supportUserId}`);
+          console.log(`Found seller ${supportUserId} with socket ${sellerSocketId}`);
+          
+          // Check if the socket still exists and is connected
+          const sellerSocket = io.sockets.sockets.get(sellerSocketId);
+          if (sellerSocket && sellerSocket.connected) {
+            const notificationData = {
+              customerId: userId,
+              supportUserId: supportUserId,
+              roomId: roomId,
+              message: `New chat request from customer ${userId}`,
+              timestamp: new Date().toISOString()
+            };
+            
+            sellerSocket.emit('new_chat_request', notificationData);
+            console.log(`✅ Notification sent to seller ${supportUserId}:`, notificationData);
+          } else {
+            console.log(`❌ Seller socket ${sellerSocketId} is not connected`);
+            // Clean up stale socket reference
+            userSockets.delete(supportUserId);
+          }
         } else {
-          console.log(`Seller ${supportUserId} is not online`);
+          console.log(`❌ Seller ${supportUserId} is not online`);
+          console.log('Available users:', Array.from(userSockets.entries()));
         }
       }
       
+      // Notify other users in the room
       socket.to(roomId).emit('user_joined', {
         userId,
         userType,
@@ -101,6 +120,7 @@ function initializeSocket(server) {
         roomId: userInfo.roomId
       };
 
+      // Send to all users in the room including sender
       io.to(userInfo.roomId).emit('receive_message', messageData);
       
       console.log('Message sent in room:', userInfo.roomId, messageData);
@@ -120,17 +140,23 @@ function initializeSocket(server) {
     socket.on('disconnect', () => {
       const userInfo = connectedUsers.get(socket.id);
       if (userInfo) {
-        socket.to(userInfo.roomId).emit('user_left', {
-          userId: userInfo.userId,
-          userType: userInfo.userType,
-          message: `${userInfo.userType} left the chat`
-        });
+        console.log(`User ${userInfo.userId} (${userInfo.userType}) disconnected`);
+        
+        // Notify room if user was in a chat
+        if (userInfo.roomId) {
+          socket.to(userInfo.roomId).emit('user_left', {
+            userId: userInfo.userId,
+            userType: userInfo.userType,
+            message: `${userInfo.userType} left the chat`
+          });
+        }
         
         // Clean up maps
         connectedUsers.delete(socket.id);
         userSockets.delete(userInfo.userId);
       }
       console.log('User disconnected:', socket.id);
+      console.log('Remaining active users:', Array.from(userSockets.keys()));
     });
   });
 
