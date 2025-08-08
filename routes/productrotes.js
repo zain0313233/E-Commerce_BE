@@ -54,12 +54,11 @@ const uploadImageTocloudinary = async (buffer, fileName) => {
       public_id: fileName,
       resource_type: "image"
     });
+    console.log("Cloudinary upload successful:", result.secure_url);
     return result.secure_url;
   } catch (error) {
-    if (error.http_code === 404) {
-      return 404;
-    }
     console.error("Cloudinary upload error:", error);
+    
     return null;
   }
 };
@@ -203,19 +202,19 @@ router.post("/create-product", authenticateToken, upload.single('image'), async 
       });
     }
     
-    let image_url;
-    if (req.file) {
-      const fileName = await generateFilename(req.file.originalname);
-      try {
-        image_url = await uploadImageTocloudinary(req.file.buffer, fileName);
-      } catch (uploadError) {
-        console.error('Image upload failed:', uploadError);
-        return res.status(500).json({
-          message: 'Failed to upload image',
-          error: uploadError.message
-        });
-      }
-    }
+    let image_url = null;
+if (req.file) {
+  const fileName = await generateFilename(req.file.originalname);
+  console.log("Attempting to upload file:", fileName);
+  
+  image_url = await uploadImageTocloudinary(req.file.buffer, fileName);
+  
+  if (!image_url) {
+    console.error('Image upload failed - no URL returned');
+  } else {
+    console.log('Image uploaded successfully:', image_url);
+  }
+}
     
     let parsedTags = null;
     if (tags) {
