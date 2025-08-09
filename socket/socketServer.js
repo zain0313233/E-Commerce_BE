@@ -1,5 +1,6 @@
 const { Server } = require('socket.io');
 const { Product } = require("../models/product");
+const cache = require('../config/cache');
 
 function initializeSocket(server) {
   const io = new Server(server, {
@@ -136,6 +137,9 @@ function initializeSocket(server) {
         const updatedProduct = await updateProductStock(productId, stock);
         console.log(`Product stock updated successfully: ${updatedProduct.title} - New stock: ${updatedProduct.stock_quantity}`);
         
+        
+        invalidateProductCache(productId, updatedProduct.user_id, updatedProduct.category);
+        
         socket.broadcast.emit('productStockUpdated', { 
           productId, 
           stock,
@@ -199,5 +203,42 @@ async function updateProductStock(productId, stock) {
   }
 }
 
+function invalidateProductCache(productId, userId, category) {
+  try {
+    
+    cache.del(`product_${productId}`);
+    
+    
+    const allCacheKeys = cache.keys();
+    
+    allCacheKeys.forEach(key => {
+      
+      if (key.startsWith('products_all_') || 
+          key.startsWith('products_new_')) {
+        cache.del(key);
+      }
+      
+      
+      if (userId && key.startsWith(`products_user_${userId}_`)) {
+        cache.del(key);
+      }
+      
+      
+      if (category && key.includes(`products_category_${category.toLowerCase()}`)) {
+        cache.del(key);
+      }
+      
+      
+      if (key.startsWith('products_tag_')) {
+        cache.del(key);
+      }
+    });
+    
+    console.log(`Cache invalidated for product ${productId}`);
+    
+  } catch (error) {
+    console.error('Error invalidating cache:', error);
+  }
+}
 
 module.exports = { initializeSocket };

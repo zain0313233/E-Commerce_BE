@@ -10,13 +10,9 @@ const { getProducts } = require("../controller/getproducts");
 const { Product } = require("../models/product");
 const { headers } = require("../config/subpass");
 const cloudinary = require("cloudinary").v2;
-const NodeCache = require("node-cache");
+const cache = require('../config/cache');
 
-const cache = new NodeCache({ 
-  stdTTL: 300,
-  checkperiod: 60,
-  useClones: false
-});
+
 
 const BUNNY_CONFIG = {
   storageZoneName: process.env.BUNNY_STORAGE_ZONE_NAME || "1083770",
