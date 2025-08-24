@@ -1,4 +1,6 @@
 const { Server } = require('socket.io');
+const { Product } = require("../models/product");
+const cache = require('../config/cache');
 
 function initializeSocket(server) {
   const io = new Server(server, {
@@ -9,24 +11,21 @@ function initializeSocket(server) {
     }
   });
 
-  const connectedUsers = new Map(); // socketId -> userInfo
-  const userSockets = new Map(); // userId -> socketId
+  const connectedUsers = new Map(); 
+  const userSockets = new Map(); 
 
   io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    // Register user when they connect
     socket.on('register_user', (data) => {
       const { userId, userType } = data;
       
-      // Store user info
       connectedUsers.set(socket.id, {
         userId,
         userType,
         socketId: socket.id
       });
       
-      // Update or set the socket mapping
       userSockets.set(userId, socket.id);
       
       console.log(`${userType} ${userId} registered with socket ${socket.id}`);
@@ -36,7 +35,6 @@ function initializeSocket(server) {
     socket.on('join_chat', (data) => {
       const { userId, userType, supportUserId } = data;
       
-      // Create consistent room ID format
       let roomId;
       if (userType === 'customer') {
         roomId = `chat_${supportUserId}_${userId}`;
@@ -50,7 +48,6 @@ function initializeSocket(server) {
       socket.roomId = roomId;
       socket.supportUserId = supportUserId;
       
-      // Update user info with room details
       connectedUsers.set(socket.id, {
         userId,
         userType,
@@ -61,7 +58,6 @@ function initializeSocket(server) {
 
       console.log(`${userType} ${userId} joined room: ${roomId}`);
       
-      // If customer joins, notify the seller
       if (userType === 'customer') {
         console.log(`Looking for seller ${supportUserId}...`);
         console.log('Available sellers:', Array.from(userSockets.entries()));
@@ -70,7 +66,6 @@ function initializeSocket(server) {
         if (sellerSocketId) {
           console.log(`Found seller ${supportUserId} with socket ${sellerSocketId}`);
           
-          // Check if the socket still exists and is connected
           const sellerSocket = io.sockets.sockets.get(sellerSocketId);
           if (sellerSocket && sellerSocket.connected) {
             const notificationData = {
@@ -85,7 +80,6 @@ function initializeSocket(server) {
             console.log(`✅ Notification sent to seller ${supportUserId}:`, notificationData);
           } else {
             console.log(`❌ Seller socket ${sellerSocketId} is not connected`);
-            // Clean up stale socket reference
             userSockets.delete(supportUserId);
           }
         } else {
@@ -94,7 +88,6 @@ function initializeSocket(server) {
         }
       }
       
-      // Notify other users in the room
       socket.to(roomId).emit('user_joined', {
         userId,
         userType,
@@ -120,7 +113,6 @@ function initializeSocket(server) {
         roomId: userInfo.roomId
       };
 
-      // Send to all users in the room including sender
       io.to(userInfo.roomId).emit('receive_message', messageData);
       
       console.log('Message sent in room:', userInfo.roomId, messageData);
@@ -137,12 +129,38 @@ function initializeSocket(server) {
       }
     });
 
+    socket.on('productStockUpdated', async (data) => {
+      const { productId, stock } = data;
+      console.log(`Product stock updated: ${productId} - New stock: ${stock}`);
+      
+      try {
+        const updatedProduct = await updateProductStock(productId, stock);
+        console.log(`Product stock updated successfully: ${updatedProduct.title} - New stock: ${updatedProduct.stock_quantity}`);
+        
+        
+        invalidateProductCache(productId, updatedProduct.user_id, updatedProduct.category);
+        
+        socket.broadcast.emit('productStockUpdated', { 
+          productId, 
+          stock,
+          success: true,
+          productName: updatedProduct.title
+        });
+      } catch (err) {
+        console.error('Error updating product stock:', err);
+        
+        socket.emit('productStockUpdateError', {
+          productId,
+          error: err.message
+        });
+      }
+    });
+
     socket.on('disconnect', () => {
       const userInfo = connectedUsers.get(socket.id);
       if (userInfo) {
         console.log(`User ${userInfo.userId} (${userInfo.userType}) disconnected`);
         
-        // Notify room if user was in a chat
         if (userInfo.roomId) {
           socket.to(userInfo.roomId).emit('user_left', {
             userId: userInfo.userId,
@@ -151,7 +169,6 @@ function initializeSocket(server) {
           });
         }
         
-        // Clean up maps
         connectedUsers.delete(socket.id);
         userSockets.delete(userInfo.userId);
       }
@@ -161,6 +178,67 @@ function initializeSocket(server) {
   });
 
   return io;
+}
+
+async function updateProductStock(productId, stock) {
+  try {
+    const [updatedRows, [updatedProduct]] = await Product.update(
+      { stock_quantity: stock },
+      { 
+        where: { id: productId },
+        returning: true
+      }
+    );
+    
+    if (updatedRows === 0) {
+      throw new Error('Product not found or no changes made');
+    }
+    
+    console.log(`Product stock updated: ${updatedProduct.title} - New stock: ${updatedProduct.stock_quantity}`);
+    return updatedProduct;
+    
+  } catch (err) {
+    console.error('Error updating product stock:', err);
+    throw err;
+  }
+}
+
+function invalidateProductCache(productId, userId, category) {
+  try {
+    
+    cache.del(`product_${productId}`);
+    
+    
+    const allCacheKeys = cache.keys();
+    
+    allCacheKeys.forEach(key => {
+      
+      if (key.startsWith('products_all_') || 
+          key.startsWith('products_new_')) {
+        cache.del(key);
+      }
+      
+      
+      if (userId && key.startsWith(`products_user_${userId}_`)) {
+        cache.del(key);
+      }
+      
+      
+      if (category && key.includes(`products_category_${category.toLowerCase()}`)) {
+        cache.del(key);
+      }
+      
+      
+      if (key.startsWith('products_tag_')) {
+        cache.del(key);
+      }
+    });
+    
+    console.log(`Cache invalidated for product ${productId}`);
+    
+  } catch (error) {
+    console.error('Error invalidating cache:', error);
+  }
 }
 
 module.exports = { initializeSocket };

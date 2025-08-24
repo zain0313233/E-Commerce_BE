@@ -1,5 +1,5 @@
 const axios = require("axios");
-const { Product } = require("../models/product");
+const { Product } = require("../models/Product");
 const { getGoogleDriveAuth } = require("../config/googledrive");
 const { google } = require("googleapis");
 const fs = require("fs");

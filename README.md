@@ -43,5 +43,34 @@ s
     ```bash
     npm run dev
     ```
+🚀 Running the Project with Docker
+1️⃣ Build the Docker Image
+
+First, create the Docker image for the backend:
+
+docker build -t ecommerce_be .
+
+2️⃣ Run the Docker Container
+
+You can run the container in two ways:
+
+🔹 Option 1: Without Volume Mounts (simple run)
+
+This method runs the container directly from the image. Use it when you don’t plan to change the source code frequently.
+
+docker run --rm -p 3001:3001 ecommerce_be
+
+🔹 Option 2: With Volume Mounts (development mode)
+
+This method mounts your local project folder inside the container, so any code changes are reflected instantly without rebuilding the image.
+
+docker run --rm -p 3001:3001 -v "F:/My Projects/E-Commerce_BE:/app" -v /app/node_modules ecommerce_be
 
 
+💡 Why use volumes?
+
+Keeps node_modules inside the container (avoiding conflicts with your host machine).
+
+Speeds up development by eliminating the need to rebuild the image after every code update.
+
+✅ With this setup, your backend runs on http://localhost:3001 and is ready for development
