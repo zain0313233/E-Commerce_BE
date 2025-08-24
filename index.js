@@ -48,10 +48,10 @@ const httpLogger = pinoHttp({
 });
 
 const { testConnection } = require("./database/index");
-const Productroutes = require('./routes/productrotes');
-const authroutes = require('./routes/authroutes');
-const cartRoutes = require('./routes/cartRoutes');
-const orderRoutes = require('./routes/orderRoutes');
+const Productroutes = require('./routes/productrotes.js');
+const authroutes = require('./routes/authRoutes.js');
+const cartRoutes = require('./routes/cartRoutes.js');
+const orderRoutes = require('./routes/orderRoutes.js');
 const { getshippedOrders, UpdateOrder } = require('./controller/ordertraking.js');
 const { getproductfromcsv } = require('./controller/getproducts.js');
 const { parseWebhookBody, rateLimitPayments } = require('./middleware/stripe.js');
