@@ -52,9 +52,12 @@ const Productroutes = require('./routes/productrotes.js');
 const authroutes = require('./routes/authRoutes.js');
 const cartRoutes = require('./routes/cartRoutes.js');
 const orderRoutes = require('./routes/orderRoutes.js');
+const portalRoutes = require('./routes/portalRoutes.js');
+const chatRoutes = require('./routes/chatRoutes.js');
+const supportRoutes = require('./routes/supportRoutes.js');
 const { getshippedOrders, UpdateOrder } = require('./controller/ordertraking.js');
 const { getproductfromcsv } = require('./controller/getproducts.js');
-const { parseWebhookBody, rateLimitPayments } = require('./middleware/stripe.js');
+const { handleWebhook } = require('./controller/paymentController');
 const { initializeSocket } = require('./socket/socketServer');
 
 const app = express();
@@ -63,8 +66,12 @@ const io = initializeSocket(server);
 
 app.use(httpLogger);
 
+const corsOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean)
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: corsOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -85,9 +92,22 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+app.post(
+  '/api/order/webhook',
+  express.raw({ type: 'application/json' }),
+  (req, res, next) => {
+    req.rawBody = req.body;
+    next();
+  },
+  (req, res, next) => {
+    req.io = io;
+    next();
+  },
+  handleWebhook
+);
+
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(parseWebhookBody); 
+app.use(express.urlencoded({ extended: true })); 
 
 app.use((req, res, next) => {
   req.logger = logger;
@@ -98,6 +118,9 @@ app.use((req, res, next) => {
 app.use('/api/auth', authroutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/order', orderRoutes);
+app.use('/api/portal', portalRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/support', supportRoutes);
 app.use('/api/product', Productroutes);
 
 app.use('/api/health', (req, res) => {
@@ -141,8 +164,13 @@ async function initializeDatabase() {
     await testConnection();
     logger.info('Database connection established successfully');
   } catch (error) {
-    logger.error({ err: error }, 'Failed to connect to database');
-    process.exit(1);
+    logger.error(
+      {
+        err: error,
+        hint: 'Check Neon project is active, DATABASE_URL in .env, and remove channel_binding=require if present'
+      },
+      'Database connection test failed - API calls that need Postgres will error until this is fixed'
+    );
   }
 }
 

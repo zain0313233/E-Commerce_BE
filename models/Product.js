@@ -66,6 +66,11 @@ const Product = Sequelize.define('Product', {
     },
     comment: 'References user who created this product. Null for scraped products from external APIs'
   },
+  seed_key: {
+    type: DataTypes.STRING(160),
+    allowNull: true,
+    comment: 'Stable id for generated catalog rows; prevents duplicate seeds'
+  },
   created_at: {
     type: DataTypes.DATE,
     allowNull: false,
@@ -75,6 +80,12 @@ const Product = Sequelize.define('Product', {
   tableName: 'products',
   timestamps: false,
   schema: 'ecommerce',
+  indexes: [
+    { fields: ['category'] },
+    { fields: ['seed_key'], unique: true },
+    { fields: ['brand'] },
+    { fields: ['created_at'] },
+  ],
 });
 
 module.exports = {

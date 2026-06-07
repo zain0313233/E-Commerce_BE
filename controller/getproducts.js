@@ -5,80 +5,7 @@ const { google } = require("googleapis");
 const fs = require("fs");
 const path = require("path");
 const csv = require("csv-parser");
-const cloudinary = require("cloudinary").v2;
-
-const BUNNY_CONFIG = {
-  storageZoneName: process.env.BUNNY_STORAGE_ZONE_NAME || "1083770",
-  storagePassword: process.env.BUNNY_STORAGE_PASSWORD,
-  storageUrl: "https://storage.bunnycdn.com",
-  pullZoneUrl: process.env.BUNNY_PULL_ZONE_URL
-};
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
-
-const uploadImageTocloudinary = async (imageUrl, fileName) => {
-  try {
-    const imageResponse = await axios.get(imageUrl, {
-      responseType: "arraybuffer"
-    });
-    if (imageResponse.status === 404) {
-      console.log(`Image ${imageUrl} returned 404 - skipping upload`);
-      return 404;
-    }
-    const imageBuffer = Buffer.from(imageResponse.data);
-    const base64Data = imageBuffer.toString("base64");
-    const dataUri = `data:image/jpeg;base64,${base64Data}`;
-    const result = await cloudinary.uploader.upload(dataUri, {
-      public_id: fileName,
-      resource_type: "image"
-    });
-    return result.secure_url;
-  } catch (error) {
-    if (error.http_code === 404) {
-      return 404;
-    }
-    console.error("Cloudinary upload error:", error);
-    return null;
-  }
-};
-
-const uploadImageToBunny = async (imageUrl, fileName) => {
-  try {
-    const imageResponse = await axios.get(imageUrl, {
-      responseType: "arraybuffer"
-    });
-    if (imageResponse.status === 404) {
-      console.log(`Image ${imageUrl} returned 404 - skipping upload`);
-      return 404;
-    }
-    const imageBuffer = Buffer.from(imageResponse.data);
-
-    const uploadResponse = await axios.put(
-      `${BUNNY_CONFIG.storageUrl}/${BUNNY_CONFIG.storageZoneName}/${fileName}`,
-      imageBuffer,
-      {
-        headers: {
-          AccessKey: BUNNY_CONFIG.storagePassword,
-          "Content-Type": "application/octet-stream"
-        }
-      }
-    );
-
-    return `${BUNNY_CONFIG.pullZoneUrl}/${fileName}`;
-  } catch (error) {
-    console.error(`Error uploading image ${fileName}:`, error.message);
-    if (error.response && error.response.status === 404) {
-      console.log(
-        `Source image ${imageUrl} not found (404) - skipping product`
-      );
-      return 404;
-    }
-    return null;
-  }
-};
+const { uploadFromUrl } = require("../config/supabaseStorage");
 const getProducts = async () => {
   try {
     const response = await axios.get(
@@ -104,9 +31,9 @@ const getProducts = async () => {
         const mainImageFileName = `product_${
           product.id
         }_main.${product.images[0].split(".").pop()}`;
-        mainImageUrl = await uploadImageToBunny(
+        mainImageUrl = await uploadFromUrl(
           product.images[0],
-          mainImageFileName
+          `scraped/${mainImageFileName}`
         );
       }
 
@@ -114,9 +41,9 @@ const getProducts = async () => {
         const thumbnailFileName = `product_${
           product.id
         }_thumb.${product.thumbnail.split(".").pop()}`;
-        thumbnailUrl = await uploadImageToBunny(
+        thumbnailUrl = await uploadFromUrl(
           product.thumbnail,
-          thumbnailFileName
+          `scraped/${thumbnailFileName}`
         );
       }
 
@@ -133,7 +60,7 @@ const getProducts = async () => {
         stock_quantity: product.stock_quantity,
         rating: product.rating,
         tags: product.tags,
-        created_at: Date.now()
+        created_at: new Date()
       });
 
       console.log(`Product ${product.id} saved successfully`);
@@ -180,13 +107,17 @@ const downloadCSVFromDrive = async () => {
     }
     return csvfiles;
   } catch (error) {
-    console.error("Error occure", error);
+    console.error("Error downloading CSV from Drive:", error);
+    throw error;
   }
 };
 const getproductfromcsv = async () => {
   try {
     console.log("Starting CSV download from Google Drive...");
     const downloadedFiles = await downloadCSVFromDrive();
+    if (!downloadedFiles?.length) {
+      throw new Error("No CSV files were downloaded from Google Drive");
+    }
     // const downloadedFiles = [
     //   // 'C:\\Users\\HP\\Documents\\App Development\\My Projects\\E-Commerce_BE\\productfiles\\Procuct3.csv',
     //   // "C:\\Users\\HP\\Documents\\App Development\\My Projects\\E-Commerce_BE\\productfiles\\productone.csv"
@@ -209,9 +140,9 @@ const getproductfromcsv = async () => {
           const mainImageFileName = `product_${
             product.title
           }_main.${product.image_url.split(".").pop()}`;
-          mainImageUrl = await uploadImageTocloudinary(
+          mainImageUrl = await uploadFromUrl(
             product.image_url,
-            mainImageFileName
+            `imports/${mainImageFileName}`
           );
           if (mainImageUrl === undefined || mainImageUrl === null) {
             console.log(
@@ -226,9 +157,9 @@ const getproductfromcsv = async () => {
           const thumbnailFileName = `product_${
             product.title
           }_thumb.${product.thumbnail_url.split(".").pop()}`;
-          thumbnailUrl = await uploadImageTocloudinary(
+          thumbnailUrl = await uploadFromUrl(
             product.thumbnail_url,
-            thumbnailFileName
+            `imports/${thumbnailFileName}`
           );
           if (thumbnailUrl === undefined || thumbnailUrl === null) {
             console.log(
@@ -253,7 +184,7 @@ const getproductfromcsv = async () => {
             price: product.price,
             discount_percentage: product.discount_percentage,
             category: product.category,
-            brand: product.category,
+            brand: product.brand || product.category,
             image_url: mainImageUrl,
             thumbnail_url: thumbnailUrl,
             stock_quantity: product.stock_quantity,
@@ -303,7 +234,7 @@ const processCSVFile = async (filePath) => {
         resolve(Product);
       })
       .on("error", (error) => {
-        reject(Product);
+        reject(error);
       });
   });
 };

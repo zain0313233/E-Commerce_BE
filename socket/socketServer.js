@@ -1,243 +1,228 @@
-const { Server } = require('socket.io');
-const { Product } = require("../models/product");
-const cache = require('../config/cache');
+const { Server } = require("socket.io");
+const { Product } = require("../models/Product");
+const cache = require("../config/cache");
+const { authenticateSocket } = require("./socketAuth");
+const { saveMessage, buildRoomId, validateChatJoin } = require("../services/chatService");
+
+function getCorsOrigins() {
+  if (process.env.ALLOWED_ORIGINS) {
+    return process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean);
+  }
+  return ["http://localhost:3000", "http://localhost:3001"];
+}
 
 function initializeSocket(server) {
   const io = new Server(server, {
     cors: {
-      origin: ['http://localhost:3000', 'http://localhost:3001'],
-      methods: ['GET', 'POST'],
-      credentials: true
-    }
+      origin: getCorsOrigins(),
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
   });
 
-  const connectedUsers = new Map(); 
-  const userSockets = new Map(); 
+  io.use(authenticateSocket);
 
-  io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+  const connectedUsers = new Map();
+  const userSockets = new Map();
 
-    socket.on('register_user', (data) => {
-      const { userId, userType } = data;
-      
-      connectedUsers.set(socket.id, {
-        userId,
-        userType,
-        socketId: socket.id
-      });
-      
-      userSockets.set(userId, socket.id);
-      
-      console.log(`${userType} ${userId} registered with socket ${socket.id}`);
-      console.log('Active users:', Array.from(userSockets.keys()));
+  io.on("connection", (socket) => {
+    const { id: userId, role, name } = socket.user;
+    const userType = role === "seller" ? "seller" : "customer";
+
+    connectedUsers.set(socket.id, {
+      userId,
+      userType,
+      userName: name,
+      socketId: socket.id,
     });
+    userSockets.set(userId, socket.id);
 
-    socket.on('join_chat', (data) => {
-      const { userId, userType, supportUserId } = data;
-      
-      let roomId;
-      if (userType === 'customer') {
-        roomId = `chat_${supportUserId}_${userId}`;
-      } else if (userType === 'seller') {
-        roomId = `chat_${userId}_${supportUserId}`;
-      }
-      
-      socket.join(roomId);
-      socket.userId = userId;
-      socket.userType = userType;
-      socket.roomId = roomId;
-      socket.supportUserId = supportUserId;
-      
-      connectedUsers.set(socket.id, {
-        userId,
-        userType,
-        roomId,
-        socketId: socket.id,
-        supportUserId
-      });
+    socket.emit("connected", { userId, userType, userName: name });
 
-      console.log(`${userType} ${userId} joined room: ${roomId}`);
-      
-      if (userType === 'customer') {
-        console.log(`Looking for seller ${supportUserId}...`);
-        console.log('Available sellers:', Array.from(userSockets.entries()));
-        
-        const sellerSocketId = userSockets.get(supportUserId);
-        if (sellerSocketId) {
-          console.log(`Found seller ${supportUserId} with socket ${sellerSocketId}`);
-          
-          const sellerSocket = io.sockets.sockets.get(sellerSocketId);
-          if (sellerSocket && sellerSocket.connected) {
-            const notificationData = {
-              customerId: userId,
-              supportUserId: supportUserId,
-              roomId: roomId,
-              message: `New chat request from customer ${userId}`,
-              timestamp: new Date().toISOString()
-            };
-            
-            sellerSocket.emit('new_chat_request', notificationData);
-            console.log(`✅ Notification sent to seller ${supportUserId}:`, notificationData);
-          } else {
-            console.log(`❌ Seller socket ${sellerSocketId} is not connected`);
-            userSockets.delete(supportUserId);
-          }
-        } else {
-          console.log(`❌ Seller ${supportUserId} is not online`);
-          console.log('Available users:', Array.from(userSockets.entries()));
-        }
-      }
-      
-      socket.to(roomId).emit('user_joined', {
-        userId,
-        userType,
+    socket.on("join_chat", async (data) => {
+      const { supportUserId, productId } = data || {};
+
+      const validation = await validateChatJoin({
+        user: socket.user,
         supportUserId,
-        message: `${userType} joined the chat`
+        productId,
       });
-    });
-
-    socket.on('send_message', (data) => {
-      const userInfo = connectedUsers.get(socket.id);
-      
-      if (!userInfo) {
-        socket.emit('error', { message: 'User not in any chat room' });
+      if (!validation.ok) {
+        socket.emit("error", { message: validation.message });
         return;
       }
 
-      const messageData = {
-        id: Date.now() + Math.random(),
-        message: data.message,
-        senderId: userInfo.userId,
-        senderType: userInfo.userType,
-        timestamp: new Date().toISOString(),
-        roomId: userInfo.roomId
-      };
+      let roomId;
 
-      io.to(userInfo.roomId).emit('receive_message', messageData);
-      
-      console.log('Message sent in room:', userInfo.roomId, messageData);
-    });
-
-    socket.on('typing', (data) => {
-      const userInfo = connectedUsers.get(socket.id);
-      if (userInfo) {
-        socket.to(userInfo.roomId).emit('user_typing', {
-          userId: userInfo.userId,
-          userType: userInfo.userType,
-          isTyping: data.isTyping
-        });
+      if (userType === "customer") {
+        roomId = buildRoomId(supportUserId, userId);
+      } else {
+        roomId = buildRoomId(userId, supportUserId);
       }
-    });
 
-    socket.on('productStockUpdated', async (data) => {
-      const { productId, stock } = data;
-      console.log(`Product stock updated: ${productId} - New stock: ${stock}`);
-      
-      try {
-        const updatedProduct = await updateProductStock(productId, stock);
-        console.log(`Product stock updated successfully: ${updatedProduct.title} - New stock: ${updatedProduct.stock_quantity}`);
-        
-        
-        invalidateProductCache(productId, updatedProduct.user_id, updatedProduct.category);
-        
-        socket.broadcast.emit('productStockUpdated', { 
-          productId, 
-          stock,
-          success: true,
-          productName: updatedProduct.title
-        });
-      } catch (err) {
-        console.error('Error updating product stock:', err);
-        
-        socket.emit('productStockUpdateError', {
-          productId,
-          error: err.message
-        });
-      }
-    });
+      socket.join(roomId);
+      socket.roomId = roomId;
+      socket.productId = productId || null;
 
-    socket.on('disconnect', () => {
-      const userInfo = connectedUsers.get(socket.id);
-      if (userInfo) {
-        console.log(`User ${userInfo.userId} (${userInfo.userType}) disconnected`);
-        
-        if (userInfo.roomId) {
-          socket.to(userInfo.roomId).emit('user_left', {
-            userId: userInfo.userId,
-            userType: userInfo.userType,
-            message: `${userInfo.userType} left the chat`
+      connectedUsers.set(socket.id, {
+        userId,
+        userType,
+        userName: name,
+        roomId,
+        socketId: socket.id,
+        supportUserId,
+        productId: socket.productId,
+      });
+
+      if (userType === "customer") {
+        const sellerSocketId = userSockets.get(Number(supportUserId));
+        if (sellerSocketId) {
+          const sellerSocket = io.sockets.sockets.get(sellerSocketId);
+          if (sellerSocket?.connected) {
+            sellerSocket.emit("new_chat_request", {
+              customerId: userId,
+              customerName: name,
+              supportUserId: Number(supportUserId),
+              roomId,
+              productId: productId || null,
+              message: `${name || "A customer"} wants to chat`,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        } else {
+          socket.emit("seller_offline", {
+            message: "Seller is offline. Messages will be saved—they can reply when back.",
           });
         }
-        
-        connectedUsers.delete(socket.id);
-        userSockets.delete(userInfo.userId);
       }
-      console.log('User disconnected:', socket.id);
-      console.log('Remaining active users:', Array.from(userSockets.keys()));
+
+      socket.to(roomId).emit("user_joined", {
+        userId,
+        userType,
+        userName: name,
+        roomId,
+      });
+    });
+
+    socket.on("send_message", async (data) => {
+      const userInfo = connectedUsers.get(socket.id);
+      if (!userInfo?.roomId) {
+        socket.emit("error", { message: "Join a chat room first" });
+        return;
+      }
+
+      const text = (data?.message || "").trim();
+      const mediaUrl = data?.mediaUrl || null;
+      if (!text && !mediaUrl) return;
+
+      try {
+        const saved = await saveMessage({
+          roomId: userInfo.roomId,
+          senderId: userInfo.userId,
+          senderType: userInfo.userType,
+          message: text,
+          productId: data?.productId || userInfo.productId || null,
+          mediaType: data?.mediaType || null,
+          mediaUrl,
+          fileName: data?.fileName || null,
+          mediaDuration: data?.mediaDuration || null,
+        });
+
+        io.to(userInfo.roomId).emit("receive_message", saved);
+      } catch (err) {
+        console.error("save message:", err);
+        socket.emit("error", { message: "Could not save message" });
+      }
+    });
+
+    socket.on("typing", (data) => {
+      const userInfo = connectedUsers.get(socket.id);
+      if (userInfo?.roomId) {
+        socket.to(userInfo.roomId).emit("user_typing", {
+          userId: userInfo.userId,
+          userType: userInfo.userType,
+          userName: userInfo.userName,
+          isTyping: Boolean(data?.isTyping),
+        });
+      }
+    });
+
+    socket.on("productStockUpdated", async (data) => {
+      if (userType !== "seller") {
+        socket.emit("error", { message: "Only sellers can update stock via chat" });
+        return;
+      }
+      const { productId, stock } = data || {};
+      try {
+        const updatedProduct = await updateProductStock(productId, stock, userId);
+        invalidateProductCache(
+          productId,
+          updatedProduct.user_id,
+          updatedProduct.category
+        );
+        socket.broadcast.emit("productStockUpdated", {
+          productId,
+          stock,
+          success: true,
+          productName: updatedProduct.title,
+        });
+      } catch (err) {
+        socket.emit("productStockUpdateError", {
+          productId,
+          error: err.message,
+        });
+      }
+    });
+
+    socket.on("disconnect", () => {
+      const userInfo = connectedUsers.get(socket.id);
+      if (userInfo?.roomId) {
+        socket.to(userInfo.roomId).emit("user_left", {
+          userId: userInfo.userId,
+          userType: userInfo.userType,
+          userName: userInfo.userName,
+        });
+      }
+      connectedUsers.delete(socket.id);
+      if (userInfo) userSockets.delete(userInfo.userId);
     });
   });
 
   return io;
 }
 
-async function updateProductStock(productId, stock) {
-  try {
-    const [updatedRows, [updatedProduct]] = await Product.update(
-      { stock_quantity: stock },
-      { 
-        where: { id: productId },
-        returning: true
-      }
-    );
-    
-    if (updatedRows === 0) {
-      throw new Error('Product not found or no changes made');
-    }
-    
-    console.log(`Product stock updated: ${updatedProduct.title} - New stock: ${updatedProduct.stock_quantity}`);
-    return updatedProduct;
-    
-  } catch (err) {
-    console.error('Error updating product stock:', err);
-    throw err;
+async function updateProductStock(productId, stock, sellerId) {
+  const product = await Product.findByPk(productId);
+  if (!product) throw new Error("Product not found");
+  if (String(product.user_id) !== String(sellerId)) {
+    throw new Error("You can only update your own products");
   }
+  const qty = Math.max(0, parseInt(stock, 10));
+  if (Number.isNaN(qty)) throw new Error("Invalid stock quantity");
+  await product.update({ stock_quantity: qty });
+  return product;
 }
 
 function invalidateProductCache(productId, userId, category) {
   try {
-    
     cache.del(`product_${productId}`);
-    
-    
     const allCacheKeys = cache.keys();
-    
-    allCacheKeys.forEach(key => {
-      
-      if (key.startsWith('products_all_') || 
-          key.startsWith('products_new_')) {
+    allCacheKeys.forEach((key) => {
+      if (key.startsWith("products_all_") || key.startsWith("products_new_")) {
         cache.del(key);
       }
-      
-      
       if (userId && key.startsWith(`products_user_${userId}_`)) {
         cache.del(key);
       }
-      
-      
       if (category && key.includes(`products_category_${category.toLowerCase()}`)) {
         cache.del(key);
       }
-      
-      
-      if (key.startsWith('products_tag_')) {
+      if (key.startsWith("products_tag_")) {
         cache.del(key);
       }
     });
-    
-    console.log(`Cache invalidated for product ${productId}`);
-    
   } catch (error) {
-    console.error('Error invalidating cache:', error);
+    console.error("Error invalidating cache:", error);
   }
 }
 

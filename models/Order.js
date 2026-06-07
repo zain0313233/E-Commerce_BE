@@ -57,8 +57,20 @@ const Order = Sequelize.define(
       allowNull: false,
       defaultValue: "pending",
       validate: {
-        isIn: [["pending", "processing", "shipped", "delivered", "cancelled"]]
+        isIn: [["pending", "processing", "shipped", "delivered", "cancelled", "failed"]]
       }
+    },
+    stripe_session_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    stripe_payment_intent_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    payment_status: {
+      type: DataTypes.STRING(50),
+      allowNull: true
     },
     ordered_at: {
       type: DataTypes.DATE,

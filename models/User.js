@@ -113,6 +113,45 @@ const User = Sequelize.define('User', {
         type: DataTypes.UUID,
         allowNull: true,
         unique: true
+    },
+    // Seller-specific fields for marketplace
+    shop_name: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        validate: {
+            len: [0, 255]
+        }
+    },
+    shop_description: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    shop_logo_url: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    seller_verified: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false
+    },
+    seller_rating: {
+        type: DataTypes.DECIMAL(3, 2),
+        allowNull: true,
+        validate: {
+            min: 0,
+            max: 5
+        }
+    },
+    total_sales: {
+        type: DataTypes.INTEGER,
+        defaultValue: 0,
+        allowNull: false
+    },
+    profile_complete: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+        allowNull: false
     }
 }, {
     tableName: 'users',

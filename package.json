@@ -6,6 +6,12 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon --legacy-watch index.js",
+    "seed:products": "node scripts/seed-products.js",
+    "seed:products:full": "node scripts/seed-products.js --per-category=500",
+    "seed:refresh-images": "node scripts/refresh-product-images.js",
+    "images:warm-tavily": "node scripts/warm-category-images-tavily.js",
+    "images:fix-broken": "node scripts/fix-broken-product-images.js",
+    "create:admin": "node scripts/create-admin.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {

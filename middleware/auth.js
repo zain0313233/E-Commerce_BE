@@ -27,7 +27,6 @@ const dbUser=await User.findOne({
       return res.status(404).json({
         success: false,
         message: "User profile not found. Please complete registration.",
-        supabase_user: user 
       });
     }
 
@@ -47,7 +46,6 @@ const dbUser=await User.findOne({
     return res.status(401).json({ 
       success: false,
       message: "Authentication failed",
-      error: err.message 
     });
   }
 }
